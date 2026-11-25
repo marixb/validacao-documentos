@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validação Inteligente de Documentos</title>
+  <style>
+    /* Paleta 60-30-10: branco (base), preto (estrutura), vermelho (destaque) */
+    :root {
+      --branco: #f4f3ef;
+      --branco-puro: #ffffff;
+      --preto: #111111;
+      --cinza: #5c5c5c;
+      --vermelho: #b8170c;
+      --raio: 22px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Times New Roman", Times, serif;
+      background: var(--branco);
+      color: var(--preto);
+      min-height: 100vh;
+    }
+    button, input, select { font-family: inherit; }
+
+    /* ---------- Cabeçalho ---------- */
+    header { padding: 48px 48px 40px; border-bottom: 6px solid var(--preto); }
+    header h1 { font-size: 46px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.05; }
+    header h1 span { color: var(--vermelho); }
+    header p { color: var(--cinza); margin-top: 12px; font-size: 18px; font-style: italic; }
+    .status {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 18px;
+      background: var(--preto); color: var(--branco);
+      padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    }
+    .status .ponto { width: 9px; height: 9px; border-radius: 50%; background: #888; }
+    .status.online .ponto { background: var(--branco); }
+    .status.offline .ponto { background: var(--vermelho); }
+
+    main { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
+
+    /* ---------- Etapas do fluxo ---------- */
+    .fluxo { display: flex; margin-bottom: 36px; border: 3px solid var(--preto); border-radius: 999px; overflow: hidden; background: var(--branco-puro); }
+    .etapa {
+      flex: 1; padding: 14px 10px; text-align: center;
+      font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+      border-right: 3px solid var(--preto); transition: all .3s;
+    }
+    .etapa:last-child { border-right: none; }
+    .etapa .icone { display: block; font-size: 12px; font-weight: 400; color: var(--cinza); margin-bottom: 2px; }
+    .etapa.ativa { background: var(--vermelho); color: var(--branco); }
+    .etapa.ativa .icone { color: var(--branco); }
+    .etapa.feita { background: var(--preto); color: var(--branco); }
+    .etapa.feita .icone { color: #bbb; }
+    .etapa.breve { color: #aaa; background: var(--branco); }
+    .etapa small { display: block; font-size: 12px; font-weight: 400; margin-top: 2px; text-transform: none; letter-spacing: 0; font-style: italic; }
+
+    /* ---------- Cartões ---------- */
+    .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+    @media (max-width: 800px) {
+      .grade { grid-template-columns: 1fr; }
+      .fluxo { border-radius: 24px; }
+    }
+    .cartao { background: var(--branco-puro); border: 3px solid var(--preto); border-radius: var(--raio); padding: 28px; }
+    .cartao h2 { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+    .cartao h2 .num {
+      background: var(--preto); color: var(--branco); width: 32px; height: 32px;
+      border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+
+    /* ---------- Área de envio ---------- */
+    .soltar {
+      display: block; border: 3px dashed var(--preto); border-radius: 18px;
+      padding: 40px 20px; text-align: center; cursor: pointer; transition: all .2s; background: var(--branco);
+    }
+    .soltar:hover, .soltar.arrastando { border-color: var(--vermelho); border-style: solid; }
+    .soltar .grande { display: inline-flex; gap: 5px; margin-bottom: 6px; }
+    .soltar .grande i { display: block; width: 8px; height: 34px; border-radius: 4px; background: var(--preto); }
+    .soltar .grande i:nth-child(2) { background: var(--vermelho); }
+    .soltar strong { display: block; margin: 8px 0 4px; font-size: 19px; }
+    .soltar span { color: var(--cinza); font-size: 15px; font-style: italic; }
+    input[type="file"] { display: none; }
+
+    .arquivo-escolhido {
+      display: none; margin-top: 16px; padding: 12px;
+      border: 2px solid var(--preto); border-radius: 14px; align-items: center; gap: 12px;
+    }
+    .arquivo-escolhido.visivel { display: flex; }
+    #miniatura { flex-shrink: 0; width: 56px; height: 56px; }
+    .arquivo-escolhido img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }
+    .arquivo-escolhido .pdf { width: 56px; height: 56px; border-radius: 8px; background: var(--preto); color: var(--branco);
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; }
+    .arquivo-escolhido .info { flex: 1; font-size: 16px; font-weight: 700; overflow: hidden; }
+    .arquivo-escolhido .info div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .arquivo-escolhido .info small { color: var(--cinza); font-weight: 400; font-size: 14px; }
+    .remover { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--preto); }
+    .remover:hover { color: var(--vermelho); }
+
+    .botao {
+      width: 100%; margin-top: 18px; padding: 16px;
+      background: var(--vermelho); color: var(--branco); border: none; border-radius: 999px;
+      font-size: 17px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
+      transition: background .2s; display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .botao:hover:not(:disabled) { background: var(--preto); }
+    .botao:disabled { background: #d9d7d0; color: #8a8a8a; cursor: not-allowed; }
+    .girando {
+      width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.35);
+      border-top-color: #fff; border-radius: 50%; animation: girar .8s linear infinite; display: none;
+    }
+    .carregando .girando { display: inline-block; }
+    @keyframes girar { to { transform: rotate(360deg); } }
+
+    /* ---------- Resultado ---------- */
+    .vazio { color: var(--cinza); text-align: center; padding: 48px 10px; font-size: 16px; font-style: italic; }
+    .vazio .grande { display: flex; justify-content: center; gap: 5px; margin-bottom: 14px; }
+    .vazio .grande i { display: block; width: 8px; height: 34px; border-radius: 4px; background: #d0cec7; }
+    .resumo { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+    .selo { padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; border: 2px solid var(--preto); }
+    .selo.sucesso { background: var(--preto); color: var(--branco); }
+    .rotulo { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+    .texto-extraido {
+      background: var(--branco); border-left: 6px solid var(--preto); border-radius: 6px;
+      padding: 16px; font-size: 16px; margin-top: 10px;
+      white-space: pre-wrap; max-height: 320px; overflow-y: auto; line-height: 1.6;
+    }
+    .acoes { display: flex; gap: 10px; margin-top: 14px; }
+    .botao-sec {
+      flex: 1; padding: 11px; border: 2px solid var(--preto); background: var(--branco-puro);
+      border-radius: 999px; cursor: pointer; font-size: 15px; font-weight: 700;
+    }
+    .botao-sec:hover { background: var(--preto); color: var(--branco); }
+    .erro { border: 3px solid var(--vermelho); color: var(--vermelho); padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; }
+
+    footer { text-align: center; color: var(--cinza); font-size: 14px; padding: 36px 0; border-top: 3px solid var(--preto); margin-top: 20px; }
+    footer a { color: var(--vermelho); font-weight: 700; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Validação Inteligente <span>de Documentos</span></h1>
+  <p>Enviando um documento .</p>
+  <div class="status" id="status"><span class="ponto"></span><span id="status-texto">Verificando...</span></div>
+</header>
+
+<main>
+  <!-- Etapas do fluxo da solução -->
+  <div class="fluxo">
+    <div class="etapa" id="etapa-upload"><span class="icone">01</span>Upload</div>
+    <div class="etapa" id="etapa-ocr"><span class="icone">02</span>OCR</div>
+    <div class="etapa breve"><span class="icone">03</span>IA<small>em breve</small></div>
+    <div class="etapa breve"><span class="icone">04</span>Validação<small>em breve</small></div>
+    <div class="etapa" id="etapa-resultado"><span class="icone">05</span>Resultado</div>
+  </div>
+
+  <div class="grade">
+    <!-- Envio -->
+    <section class="cartao">
+      <h2><span class="num">1</span> Enviar documento</h2>
+
+      <label class="soltar" id="soltar" for="arquivo">
+        <div class="grande"><i></i><i></i><i></i></div>
+        <strong>Clique ou arraste o arquivo aqui</strong>
+        <span>Formatos aceitos: PDF, PNG ou JPG</span>
+      </label>
+      <input type="file" id="arquivo" accept=".pdf,.png,.jpg,.jpeg">
+
+      <div class="arquivo-escolhido" id="escolhido">
+        <div id="miniatura"></div>
+        <div class="info">
+          <div id="nome-arquivo"></div>
+          <small id="tamanho-arquivo"></small>
+        </div>
+        <button class="remover" id="remover" title="Remover arquivo">✕</button>
+      </div>
+
+      <button class="botao" id="processar" disabled>
+        <span class="girando"></span><span id="texto-botao">Processar documento</span>
+      </button>
+    </section>
+
+    <!-- Resultado -->
+    <section class="cartao">
+      <h2><span class="num">2</span> Resultado</h2>
+      <div id="resultado">
+        <div class="vazio"><span class="grande"><i></i><i></i><i></i></span>O resultado aparecerá aqui depois que você enviar um documento.</div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  Projeto do semestre · Mentoria 2026.2 · <a href="/docs">Documentação da API</a>
+</footer>
+
+<script>
+  const TIPOS = [".pdf", ".png", ".jpg", ".jpeg"];
+  const campo = document.getElementById("arquivo");
+  const soltar = document.getElementById("soltar");
+  const escolhido = document.getElementById("escolhido");
+  const botao = document.getElementById("processar");
+  const resultado = document.getElementById("resultado");
+  let arquivoAtual = null;
+
+  // ---------- Status da API ----------
+  fetch("/status")
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById("status").classList.add("online");
+      document.getElementById("status-texto").textContent = `API online · OCR ${d.versao_tesseract}`;
+    })
+    .catch(() => {
+      document.getElementById("status").classList.add("offline");
+      document.getElementById("status-texto").textContent = "API fora do ar";
+    });
+
+  // ---------- Etapas ----------
+  function marcarEtapas(estado) {
+    const ids = ["etapa-upload", "etapa-ocr", "etapa-resultado"];
+    ids.forEach(id => document.getElementById(id).classList.remove("ativa", "feita"));
+    if (estado === "escolhido") document.getElementById("etapa-upload").classList.add("ativa");
+    if (estado === "processando") {
+      document.getElementById("etapa-upload").classList.add("feita");
+      document.getElementById("etapa-ocr").classList.add("ativa");
+    }
+    if (estado === "concluido") ids.forEach(id => document.getElementById(id).classList.add("feita"));
+  }
+
+  // ---------- Escolha do arquivo ----------
+  function formatarTamanho(bytes) {
+    return bytes < 1024 * 1024 ? (bytes / 1024).toFixed(0) + " KB" : (bytes / 1024 / 1024).toFixed(1) + " MB";
+  }
+
+  function escolherArquivo(arquivo) {
+    if (!arquivo) return;
+    const nome = arquivo.name.toLowerCase();
+    if (!TIPOS.some(t => nome.endsWith(t))) {
+      mostrarErro("Tipo de arquivo não suportado. Envie PDF, PNG ou JPG.");
+      return;
+    }
+    arquivoAtual = arquivo;
+    document.getElementById("nome-arquivo").textContent = arquivo.name;
+    document.getElementById("tamanho-arquivo").textContent = formatarTamanho(arquivo.size);
+    const mini = document.getElementById("miniatura");
+    if (nome.endsWith(".pdf")) {
+      mini.innerHTML = '<div class="pdf">PDF</div>';
+    } else {
+      mini.innerHTML = "";
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(arquivo);
+      img.alt = "Prévia do documento";
+      mini.appendChild(img);
+    }
+    escolhido.classList.add("visivel");
+    botao.disabled = false;
+    marcarEtapas("escolhido");
+  }
+
+  campo.addEventListener("change", () => escolherArquivo(campo.files[0]));
+
+  ["dragenter", "dragover"].forEach(ev => soltar.addEventListener(ev, e => {
+    e.preventDefault(); soltar.classList.add("arrastando");
+  }));
+  ["dragleave", "drop"].forEach(ev => soltar.addEventListener(ev, e => {
+    e.preventDefault(); soltar.classList.remove("arrastando");
+  }));
+  soltar.addEventListener("drop", e => escolherArquivo(e.dataTransfer.files[0]));
+
+  document.getElementById("remover").addEventListener("click", () => {
+    arquivoAtual = null;
+    campo.value = "";
+    escolhido.classList.remove("visivel");
+    botao.disabled = true;
+    marcarEtapas("");
+  });
+
+  // ---------- Resultado ----------
+  function mostrarErro(mensagem) {
+    resultado.innerHTML = "";
+    const div = document.createElement("div");
+    div.className = "erro";
+    div.textContent = mensagem;
+    resultado.appendChild(div);
+  }
+
+  function mostrarResultado(dados) {
+    resultado.innerHTML = `
+      <div class="resumo">
+        <span class="selo sucesso">Processado</span>
+        <span class="selo" id="r-paginas"></span>
+        <span class="selo" id="r-arquivo"></span>
+      </div>
+      <span class="rotulo">Texto extraído (OCR)</span>
+      <div class="texto-extraido" id="r-texto"></div>
+      <div class="acoes">
+        <button class="botao-sec" id="copiar">Copiar texto</button>
+        <button class="botao-sec" id="baixar">Baixar .txt</button>
+      </div>`;
+    document.getElementById("r-paginas").textContent =
+      dados.paginas + (dados.paginas === 1 ? " página" : " páginas");
+    document.getElementById("r-arquivo").textContent = dados.arquivo;
+    const texto = dados.texto_extraido.trim() || "(Nenhum texto foi encontrado no documento.)";
+    document.getElementById("r-texto").textContent = texto;
+
+    document.getElementById("copiar").onclick = async (e) => {
+      await navigator.clipboard.writeText(texto);
+      e.target.textContent = "Copiado!";
+      setTimeout(() => e.target.textContent = "Copiar texto", 1500);
+    };
+    document.getElementById("baixar").onclick = () => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([texto], { type: "text/plain" }));
+      link.download = dados.arquivo.replace(/\.[^.]+$/, "") + "_texto.txt";
+      link.click();
+    };
+  }
+
+  // ---------- Envio para a API ----------
+  botao.addEventListener("click", async () => {
+    if (!arquivoAtual) return;
+    const formulario = new FormData();
+    formulario.append("arquivo", arquivoAtual);
+
+    botao.disabled = true;
+    botao.classList.add("carregando");
+    document.getElementById("texto-botao").textContent = "Processando...";
+    resultado.innerHTML = '<div class="vazio"><span class="grande"><i></i><i></i><i></i></span>Lendo o documento, aguarde...</div>';
+    marcarEtapas("processando");
+
+    try {
+      const resposta = await fetch("/upload", { method: "POST", body: formulario });
+      const dados = await resposta.json();
+      if (!resposta.ok) throw new Error(dados.erro || "Erro ao processar o documento.");
+      mostrarResultado(dados);
+      marcarEtapas("concluido");
+    } catch (erro) {
+      mostrarErro(erro.message === "Failed to fetch" ? "Não foi possível conectar à API." : erro.message);
+      marcarEtapas("escolhido");
+    } finally {
+      botao.disabled = false;
+      botao.classList.remove("carregando");
+      document.getElementById("texto-botao").textContent = "Processar documento";
+    }
+  });
+</script>
+</body>
+</html>
