@@ -11,16 +11,12 @@
       --branco-puro: #ffffff;
       --preto: #111111;
       --cinza: #5c5c5c;
+      --cinza-claro: #d0cec7;
       --vermelho: #b8170c;
       --raio: 22px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: "Times New Roman", Times, serif;
-      background: var(--branco);
-      color: var(--preto);
-      min-height: 100vh;
-    }
+    body { font-family: "Times New Roman", Times, serif; background: var(--branco); color: var(--preto); min-height: 100vh; }
     button, input, select { font-family: inherit; }
 
     /* ---------- Cabeçalho ---------- */
@@ -37,7 +33,7 @@
     .status.online .ponto { background: var(--branco); }
     .status.offline .ponto { background: var(--vermelho); }
 
-    main { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
+    main { max-width: 1140px; margin: 40px auto; padding: 0 24px; }
 
     /* ---------- Etapas do fluxo ---------- */
     .fluxo { display: flex; margin-bottom: 36px; border: 3px solid var(--preto); border-radius: 999px; overflow: hidden; background: var(--branco-puro); }
@@ -52,21 +48,17 @@
     .etapa.ativa .icone { color: var(--branco); }
     .etapa.feita { background: var(--preto); color: var(--branco); }
     .etapa.feita .icone { color: #bbb; }
-    .etapa.breve { color: #aaa; background: var(--branco); }
-    .etapa small { display: block; font-size: 12px; font-weight: 400; margin-top: 2px; text-transform: none; letter-spacing: 0; font-style: italic; }
 
     /* ---------- Cartões ---------- */
-    .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
-    @media (max-width: 800px) {
-      .grade { grid-template-columns: 1fr; }
-      .fluxo { border-radius: 24px; }
-    }
+    .grade { display: grid; grid-template-columns: 5fr 7fr; gap: 28px; align-items: start; }
+    @media (max-width: 860px) { .grade { grid-template-columns: 1fr; } .fluxo { border-radius: 24px; flex-wrap: wrap; } }
     .cartao { background: var(--branco-puro); border: 3px solid var(--preto); border-radius: var(--raio); padding: 28px; }
     .cartao h2 { font-size: 24px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
     .cartao h2 .num {
       background: var(--preto); color: var(--branco); width: 32px; height: 32px;
       border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
     }
+    .historico { margin-top: 28px; }
 
     /* ---------- Área de envio ---------- */
     .soltar {
@@ -74,17 +66,16 @@
       padding: 40px 20px; text-align: center; cursor: pointer; transition: all .2s; background: var(--branco);
     }
     .soltar:hover, .soltar.arrastando { border-color: var(--vermelho); border-style: solid; }
-    .soltar .grande { display: inline-flex; gap: 5px; margin-bottom: 6px; }
-    .soltar .grande i { display: block; width: 8px; height: 34px; border-radius: 4px; background: var(--preto); }
-    .soltar .grande i:nth-child(2) { background: var(--vermelho); }
+    .barras { display: inline-flex; gap: 5px; margin-bottom: 6px; }
+    .barras i { display: block; width: 8px; height: 34px; border-radius: 4px; background: var(--preto); }
+    .barras i:nth-child(2) { background: var(--vermelho); }
+    .barras.apagadas i { background: var(--cinza-claro); }
     .soltar strong { display: block; margin: 8px 0 4px; font-size: 19px; }
     .soltar span { color: var(--cinza); font-size: 15px; font-style: italic; }
+    .aviso { margin-top: 14px; font-size: 14px; color: var(--cinza); font-style: italic; }
     input[type="file"] { display: none; }
 
-    .arquivo-escolhido {
-      display: none; margin-top: 16px; padding: 12px;
-      border: 2px solid var(--preto); border-radius: 14px; align-items: center; gap: 12px;
-    }
+    .arquivo-escolhido { display: none; margin-top: 16px; padding: 12px; border: 2px solid var(--preto); border-radius: 14px; align-items: center; gap: 12px; }
     .arquivo-escolhido.visivel { display: flex; }
     #miniatura { flex-shrink: 0; width: 56px; height: 56px; }
     .arquivo-escolhido img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }
@@ -97,40 +88,61 @@
     .remover:hover { color: var(--vermelho); }
 
     .botao {
-      width: 100%; margin-top: 18px; padding: 16px;
-      background: var(--vermelho); color: var(--branco); border: none; border-radius: 999px;
+      width: 100%; margin-top: 18px; padding: 16px; background: var(--vermelho); color: var(--branco); border: none; border-radius: 999px;
       font-size: 17px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer;
       transition: background .2s; display: flex; align-items: center; justify-content: center; gap: 10px;
     }
     .botao:hover:not(:disabled) { background: var(--preto); }
     .botao:disabled { background: #d9d7d0; color: #8a8a8a; cursor: not-allowed; }
-    .girando {
-      width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.35);
-      border-top-color: #fff; border-radius: 50%; animation: girar .8s linear infinite; display: none;
-    }
+    .girando { width: 18px; height: 18px; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: girar .8s linear infinite; display: none; }
     .carregando .girando { display: inline-block; }
     @keyframes girar { to { transform: rotate(360deg); } }
 
     /* ---------- Resultado ---------- */
     .vazio { color: var(--cinza); text-align: center; padding: 48px 10px; font-size: 16px; font-style: italic; }
-    .vazio .grande { display: flex; justify-content: center; gap: 5px; margin-bottom: 14px; }
-    .vazio .grande i { display: block; width: 8px; height: 34px; border-radius: 4px; background: #d0cec7; }
-    .resumo { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
-    .selo { padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 700; border: 2px solid var(--preto); }
-    .selo.sucesso { background: var(--preto); color: var(--branco); }
-    .rotulo { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-    .texto-extraido {
-      background: var(--branco); border-left: 6px solid var(--preto); border-radius: 6px;
-      padding: 16px; font-size: 16px; margin-top: 10px;
-      white-space: pre-wrap; max-height: 320px; overflow-y: auto; line-height: 1.6;
-    }
-    .acoes { display: flex; gap: 10px; margin-top: 14px; }
-    .botao-sec {
-      flex: 1; padding: 11px; border: 2px solid var(--preto); background: var(--branco-puro);
-      border-radius: 999px; cursor: pointer; font-size: 15px; font-weight: 700;
-    }
+    .vazio .barras { display: flex; justify-content: center; margin-bottom: 14px; }
+    .decisao { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 18px 22px; border-radius: 16px; margin-bottom: 18px; color: var(--branco); }
+    .decisao.APROVADO { background: var(--preto); }
+    .decisao.REPROVADO { background: var(--vermelho); }
+    .decisao strong { font-size: 30px; letter-spacing: 3px; }
+    .decisao small { font-size: 15px; font-style: italic; opacity: .9; }
+    .meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+    .selo { padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; border: 2px solid var(--preto); }
+    .rotulo { display: block; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 20px 0 10px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 16px; }
+    .dados td { padding: 9px 4px; border-bottom: 1px solid var(--cinza-claro); vertical-align: top; }
+    .dados td:first-child { width: 38%; font-weight: 700; }
+    .faltando { color: var(--cinza); font-style: italic; }
+
+    .regras { list-style: none; }
+    .regras li { display: flex; gap: 12px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--cinza-claro); font-size: 16px; }
+    .marca { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: var(--branco); background: var(--preto); margin-top: 1px; }
+    .regras li.falhou .marca { background: var(--vermelho); }
+    .regras li.falhou strong { color: var(--vermelho); }
+    .regras small { display: block; color: var(--cinza); font-style: italic; font-size: 14px; }
+
+    details { margin-top: 20px; border: 2px solid var(--preto); border-radius: 14px; padding: 12px 16px; }
+    summary { cursor: pointer; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; font-size: 14px; }
+    .texto-extraido { background: var(--branco); border-left: 6px solid var(--preto); border-radius: 6px; padding: 16px; font-size: 15px;
+      margin-top: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto; line-height: 1.6; }
+    .acoes { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .botao-sec { flex: 1; padding: 10px 14px; border: 2px solid var(--preto); background: var(--branco-puro); color: var(--preto);
+      border-radius: 999px; cursor: pointer; font-size: 15px; font-weight: 700; text-align: center; text-decoration: none; }
     .botao-sec:hover { background: var(--preto); color: var(--branco); }
     .erro { border: 3px solid var(--vermelho); color: var(--vermelho); padding: 16px; border-radius: 14px; font-size: 16px; font-weight: 700; }
+
+    /* ---------- Histórico ---------- */
+    .tabela-historico th { text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px; padding: 10px 8px; border-bottom: 3px solid var(--preto); }
+    .tabela-historico td { padding: 11px 8px; border-bottom: 1px solid var(--cinza-claro); }
+    .tabela-historico tbody tr { cursor: pointer; }
+    .tabela-historico tbody tr:hover { background: var(--branco); }
+    .tabela-historico tr.selecionado { background: var(--branco); box-shadow: inset 5px 0 0 var(--preto); }
+    .etiqueta { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--branco); }
+    .etiqueta.APROVADO { background: var(--preto); }
+    .etiqueta.REPROVADO { background: var(--vermelho); }
 
     footer { text-align: center; color: var(--cinza); font-size: 14px; padding: 36px 0; border-top: 3px solid var(--preto); margin-top: 20px; }
     footer a { color: var(--vermelho); font-weight: 700; }
@@ -140,54 +152,53 @@
 
 <header>
   <h1>Validação Inteligente <span>de Documentos</span></h1>
-  <p>Enviando um documento .</p>
+  <p>Envie um comprovante de residência e receba a análise automática em segundos.</p>
   <div class="status" id="status"><span class="ponto"></span><span id="status-texto">Verificando...</span></div>
 </header>
 
 <main>
-  <!-- Etapas do fluxo da solução -->
   <div class="fluxo">
     <div class="etapa" id="etapa-upload"><span class="icone">01</span>Upload</div>
     <div class="etapa" id="etapa-ocr"><span class="icone">02</span>OCR</div>
-    <div class="etapa breve"><span class="icone">03</span>IA<small>em breve</small></div>
-    <div class="etapa breve"><span class="icone">04</span>Validação<small>em breve</small></div>
+    <div class="etapa" id="etapa-ia"><span class="icone">03</span>IA</div>
+    <div class="etapa" id="etapa-validacao"><span class="icone">04</span>Validação</div>
     <div class="etapa" id="etapa-resultado"><span class="icone">05</span>Resultado</div>
   </div>
 
   <div class="grade">
-    <!-- Envio -->
     <section class="cartao">
       <h2><span class="num">1</span> Enviar documento</h2>
-
       <label class="soltar" id="soltar" for="arquivo">
-        <div class="grande"><i></i><i></i><i></i></div>
+        <div class="barras"><i></i><i></i><i></i></div>
         <strong>Clique ou arraste o arquivo aqui</strong>
-        <span>Formatos aceitos: PDF, PNG ou JPG</span>
+        <span>Comprovante de residência · PDF, PNG ou JPG</span>
       </label>
       <input type="file" id="arquivo" accept=".pdf,.png,.jpg,.jpeg">
 
       <div class="arquivo-escolhido" id="escolhido">
         <div id="miniatura"></div>
-        <div class="info">
-          <div id="nome-arquivo"></div>
-          <small id="tamanho-arquivo"></small>
-        </div>
+        <div class="info"><div id="nome-arquivo"></div><small id="tamanho-arquivo"></small></div>
         <button class="remover" id="remover" title="Remover arquivo">✕</button>
       </div>
 
       <button class="botao" id="processar" disabled>
         <span class="girando"></span><span id="texto-botao">Processar documento</span>
       </button>
+      <p class="aviso">Regras: documento legível, nome, endereço e CEP identificados, emissão em até 90 dias e CPF válido (quando houver).</p>
     </section>
 
-    <!-- Resultado -->
     <section class="cartao">
       <h2><span class="num">2</span> Resultado</h2>
       <div id="resultado">
-        <div class="vazio"><span class="grande"><i></i><i></i><i></i></span>O resultado aparecerá aqui depois que você enviar um documento.</div>
+        <div class="vazio"><div class="barras apagadas"><i></i><i></i><i></i></div>O resultado aparecerá aqui depois que você enviar um documento.</div>
       </div>
     </section>
   </div>
+
+  <section class="cartao historico">
+    <h2><span class="num">3</span> Histórico de documentos</h2>
+    <div id="historico"><p class="vazio">Nenhum documento processado ainda.</p></div>
+  </section>
 </main>
 
 <footer>
@@ -196,153 +207,158 @@
 
 <script>
   const TIPOS = [".pdf", ".png", ".jpg", ".jpeg"];
-  const campo = document.getElementById("arquivo");
-  const soltar = document.getElementById("soltar");
-  const escolhido = document.getElementById("escolhido");
-  const botao = document.getElementById("processar");
-  const resultado = document.getElementById("resultado");
-  let arquivoAtual = null;
+  const ETAPAS = ["etapa-upload", "etapa-ocr", "etapa-ia", "etapa-validacao", "etapa-resultado"];
+  const ROTULOS = { nome: "Nome", cpf: "CPF", endereco: "Endereço", cep: "CEP", data_emissao: "Data de emissão" };
+  const $ = id => document.getElementById(id);
+  const campo = $("arquivo"), soltar = $("soltar"), botao = $("processar"), resultado = $("resultado");
+  let arquivoAtual = null, temporizadores = [], selecionado = null;
 
-  // ---------- Status da API ----------
-  fetch("/status")
-    .then(r => r.json())
-    .then(d => {
-      document.getElementById("status").classList.add("online");
-      document.getElementById("status-texto").textContent = `API online · OCR ${d.versao_tesseract}`;
-    })
-    .catch(() => {
-      document.getElementById("status").classList.add("offline");
-      document.getElementById("status-texto").textContent = "API fora do ar";
-    });
+  // Cria elementos com segurança (texto do OCR nunca vira HTML)
+  function el(tag, props = {}, ...filhos) {
+    const e = document.createElement(tag);
+    Object.entries(props).forEach(([k, v]) => k === "class" ? e.className = v : e[k] = v);
+    filhos.flat().forEach(f => e.append(f instanceof Node ? f : document.createTextNode(f ?? "")));
+    return e;
+  }
+  const dataBR = iso => iso ? iso.slice(0, 10).split("-").reverse().join("/") : "";
+  const dataHoraBR = iso => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+
+  // ---------- Status ----------
+  fetch("/status").then(r => r.json()).then(d => {
+    $("status").classList.add("online");
+    $("status-texto").textContent = `API online · OCR ${d.versao_tesseract} · IA ${d.ia.startsWith("configurada") ? "ativa" : "por padrões"}`;
+  }).catch(() => { $("status").classList.add("offline"); $("status-texto").textContent = "API fora do ar"; });
 
   // ---------- Etapas ----------
-  function marcarEtapas(estado) {
-    const ids = ["etapa-upload", "etapa-ocr", "etapa-resultado"];
-    ids.forEach(id => document.getElementById(id).classList.remove("ativa", "feita"));
-    if (estado === "escolhido") document.getElementById("etapa-upload").classList.add("ativa");
-    if (estado === "processando") {
-      document.getElementById("etapa-upload").classList.add("feita");
-      document.getElementById("etapa-ocr").classList.add("ativa");
-    }
-    if (estado === "concluido") ids.forEach(id => document.getElementById(id).classList.add("feita"));
+  function etapas(ativa, feitasAte) {
+    temporizadores.forEach(clearTimeout); temporizadores = [];
+    ETAPAS.forEach((id, i) => {
+      $(id).classList.remove("ativa", "feita");
+      if (i < feitasAte) $(id).classList.add("feita");
+      if (i === ativa) $(id).classList.add("ativa");
+    });
+  }
+  function animarProcessamento() {
+    etapas(1, 1);
+    temporizadores.push(setTimeout(() => etapas(2, 2), 1200));
+    temporizadores.push(setTimeout(() => etapas(3, 3), 2400));
   }
 
-  // ---------- Escolha do arquivo ----------
-  function formatarTamanho(bytes) {
-    return bytes < 1024 * 1024 ? (bytes / 1024).toFixed(0) + " KB" : (bytes / 1024 / 1024).toFixed(1) + " MB";
-  }
-
+  // ---------- Arquivo ----------
+  const tamanho = b => b < 1048576 ? (b / 1024).toFixed(0) + " KB" : (b / 1048576).toFixed(1) + " MB";
   function escolherArquivo(arquivo) {
     if (!arquivo) return;
     const nome = arquivo.name.toLowerCase();
-    if (!TIPOS.some(t => nome.endsWith(t))) {
-      mostrarErro("Tipo de arquivo não suportado. Envie PDF, PNG ou JPG.");
-      return;
-    }
+    if (!TIPOS.some(t => nome.endsWith(t))) return mostrarErro("Tipo de arquivo não suportado. Envie PDF, PNG ou JPG.");
     arquivoAtual = arquivo;
-    document.getElementById("nome-arquivo").textContent = arquivo.name;
-    document.getElementById("tamanho-arquivo").textContent = formatarTamanho(arquivo.size);
-    const mini = document.getElementById("miniatura");
-    if (nome.endsWith(".pdf")) {
-      mini.innerHTML = '<div class="pdf">PDF</div>';
-    } else {
-      mini.innerHTML = "";
-      const img = document.createElement("img");
-      img.src = URL.createObjectURL(arquivo);
-      img.alt = "Prévia do documento";
-      mini.appendChild(img);
-    }
-    escolhido.classList.add("visivel");
+    $("nome-arquivo").textContent = arquivo.name;
+    $("tamanho-arquivo").textContent = tamanho(arquivo.size);
+    $("miniatura").replaceChildren(nome.endsWith(".pdf")
+      ? el("div", { class: "pdf" }, "PDF")
+      : el("img", { src: URL.createObjectURL(arquivo), alt: "Prévia do documento" }));
+    $("escolhido").classList.add("visivel");
     botao.disabled = false;
-    marcarEtapas("escolhido");
+    etapas(0, 0);
   }
-
   campo.addEventListener("change", () => escolherArquivo(campo.files[0]));
-
-  ["dragenter", "dragover"].forEach(ev => soltar.addEventListener(ev, e => {
-    e.preventDefault(); soltar.classList.add("arrastando");
-  }));
-  ["dragleave", "drop"].forEach(ev => soltar.addEventListener(ev, e => {
-    e.preventDefault(); soltar.classList.remove("arrastando");
-  }));
+  ["dragenter", "dragover"].forEach(ev => soltar.addEventListener(ev, e => { e.preventDefault(); soltar.classList.add("arrastando"); }));
+  ["dragleave", "drop"].forEach(ev => soltar.addEventListener(ev, e => { e.preventDefault(); soltar.classList.remove("arrastando"); }));
   soltar.addEventListener("drop", e => escolherArquivo(e.dataTransfer.files[0]));
-
-  document.getElementById("remover").addEventListener("click", () => {
-    arquivoAtual = null;
-    campo.value = "";
-    escolhido.classList.remove("visivel");
-    botao.disabled = true;
-    marcarEtapas("");
+  $("remover").addEventListener("click", () => {
+    arquivoAtual = null; campo.value = ""; $("escolhido").classList.remove("visivel"); botao.disabled = true; etapas(-1, 0);
   });
 
   // ---------- Resultado ----------
-  function mostrarErro(mensagem) {
-    resultado.innerHTML = "";
-    const div = document.createElement("div");
-    div.className = "erro";
-    div.textContent = mensagem;
-    resultado.appendChild(div);
+  function mostrarErro(msg) { resultado.replaceChildren(el("div", { class: "erro" }, msg)); }
+
+  function mostrarResultado(d) {
+    const falhas = d.regras.filter(r => !r.ok).length;
+    const decisao = el("div", { class: "decisao " + d.status },
+      el("strong", {}, d.status),
+      el("small", {}, d.status === "APROVADO" ? "Todas as regras foram atendidas." : `${falhas} regra${falhas > 1 ? "s" : ""} não atendida${falhas > 1 ? "s" : ""}.`));
+
+    const meta = el("div", { class: "meta" },
+      el("span", { class: "selo" }, `Nº ${d.id}`),
+      el("span", { class: "selo" }, d.nome_arquivo),
+      el("span", { class: "selo" }, `${d.paginas} ${d.paginas === 1 ? "página" : "páginas"}`),
+      el("span", { class: "selo" }, `Leitura ${Math.round(d.confianca_ocr)}%`),
+      el("span", { class: "selo" }, `Extração: ${d.metodo_extracao}`));
+
+    const dados = el("table", { class: "dados" }, el("tbody", {}, Object.entries(ROTULOS).map(([chave, rotulo]) => {
+      const valor = chave === "data_emissao" ? dataBR(d.dados[chave]) : d.dados[chave];
+      return el("tr", {}, el("td", {}, rotulo), valor ? el("td", {}, valor) : el("td", { class: "faltando" }, "não encontrado"));
+    })));
+
+    const regras = el("ul", { class: "regras" }, d.regras.map(r =>
+      el("li", { class: r.ok ? "" : "falhou" },
+        el("span", { class: "marca" }, r.ok ? "✓" : "✕"),
+        el("div", {}, el("strong", {}, r.descricao), el("small", {}, r.mensagem)))));
+
+    const texto = d.texto_extraido || "(Nenhum texto foi encontrado no documento.)";
+    const copiar = el("button", { class: "botao-sec", textContent: "Copiar texto" });
+    copiar.onclick = async () => { await navigator.clipboard.writeText(texto); copiar.textContent = "Copiado!"; setTimeout(() => copiar.textContent = "Copiar texto", 1500); };
+    const baixar = el("button", { class: "botao-sec", textContent: "Baixar .txt" });
+    baixar.onclick = () => {
+      const a = el("a", { href: URL.createObjectURL(new Blob([texto], { type: "text/plain" })), download: d.nome_arquivo.replace(/\.[^.]+$/, "") + "_texto.txt" });
+      a.click();
+    };
+    const original = el("a", { class: "botao-sec", href: `/documentos/${d.id}/arquivo`, target: "_blank" }, "Ver arquivo original");
+
+    resultado.replaceChildren(
+      decisao, meta,
+      el("span", { class: "rotulo" }, "Dados extraídos"), dados,
+      el("span", { class: "rotulo" }, "Regras de negócio"), regras,
+      el("details", {}, el("summary", {}, "Texto extraído (OCR)"), el("div", { class: "texto-extraido" }, texto),
+        el("div", { class: "acoes" }, copiar, baixar, original)));
   }
 
-  function mostrarResultado(dados) {
-    resultado.innerHTML = `
-      <div class="resumo">
-        <span class="selo sucesso">Processado</span>
-        <span class="selo" id="r-paginas"></span>
-        <span class="selo" id="r-arquivo"></span>
-      </div>
-      <span class="rotulo">Texto extraído (OCR)</span>
-      <div class="texto-extraido" id="r-texto"></div>
-      <div class="acoes">
-        <button class="botao-sec" id="copiar">Copiar texto</button>
-        <button class="botao-sec" id="baixar">Baixar .txt</button>
-      </div>`;
-    document.getElementById("r-paginas").textContent =
-      dados.paginas + (dados.paginas === 1 ? " página" : " páginas");
-    document.getElementById("r-arquivo").textContent = dados.arquivo;
-    const texto = dados.texto_extraido.trim() || "(Nenhum texto foi encontrado no documento.)";
-    document.getElementById("r-texto").textContent = texto;
-
-    document.getElementById("copiar").onclick = async (e) => {
-      await navigator.clipboard.writeText(texto);
-      e.target.textContent = "Copiado!";
-      setTimeout(() => e.target.textContent = "Copiar texto", 1500);
-    };
-    document.getElementById("baixar").onclick = () => {
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(new Blob([texto], { type: "text/plain" }));
-      link.download = dados.arquivo.replace(/\.[^.]+$/, "") + "_texto.txt";
-      link.click();
-    };
+  // ---------- Histórico ----------
+  async function carregarHistorico() {
+    try {
+      const itens = await (await fetch("/documentos")).json();
+      if (!itens.length) return $("historico").replaceChildren(el("p", { class: "vazio" }, "Nenhum documento processado ainda."));
+      const linhas = itens.map(i => {
+        const tr = el("tr", { class: i.id === selecionado ? "selecionado" : "", title: "Clique para ver o resultado" },
+          el("td", {}, `Nº ${i.id}`), el("td", {}, dataHoraBR(i.criado_em)), el("td", {}, i.nome_arquivo),
+          el("td", {}, i.nome || "—"), el("td", {}, el("span", { class: "etiqueta " + i.status }, i.status)));
+        tr.onclick = () => abrirDocumento(i.id);
+        return tr;
+      });
+      $("historico").replaceChildren(el("table", { class: "tabela-historico" },
+        el("thead", {}, el("tr", {}, ["Número", "Enviado em", "Arquivo", "Titular", "Situação"].map(t => el("th", {}, t)))),
+        el("tbody", {}, linhas)));
+    } catch { $("historico").replaceChildren(el("p", { class: "erro" }, "Não foi possível carregar o histórico.")); }
   }
 
-  // ---------- Envio para a API ----------
+  async function abrirDocumento(id) {
+    const r = await fetch(`/documentos/${id}`);
+    const d = await r.json();
+    if (!r.ok) return mostrarErro(d.erro);
+    selecionado = id; mostrarResultado(d); etapas(-1, 5); carregarHistorico();
+    resultado.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ---------- Envio ----------
   botao.addEventListener("click", async () => {
     if (!arquivoAtual) return;
     const formulario = new FormData();
     formulario.append("arquivo", arquivoAtual);
-
-    botao.disabled = true;
-    botao.classList.add("carregando");
-    document.getElementById("texto-botao").textContent = "Processando...";
-    resultado.innerHTML = '<div class="vazio"><span class="grande"><i></i><i></i><i></i></span>Lendo o documento, aguarde...</div>';
-    marcarEtapas("processando");
-
+    botao.disabled = true; botao.classList.add("carregando"); $("texto-botao").textContent = "Processando...";
+    resultado.replaceChildren(el("div", { class: "vazio" }, el("div", { class: "barras" }, el("i"), el("i"), el("i")), "Lendo e validando o documento, aguarde..."));
+    animarProcessamento();
     try {
-      const resposta = await fetch("/upload", { method: "POST", body: formulario });
-      const dados = await resposta.json();
-      if (!resposta.ok) throw new Error(dados.erro || "Erro ao processar o documento.");
-      mostrarResultado(dados);
-      marcarEtapas("concluido");
-    } catch (erro) {
-      mostrarErro(erro.message === "Failed to fetch" ? "Não foi possível conectar à API." : erro.message);
-      marcarEtapas("escolhido");
+      const r = await fetch("/documentos", { method: "POST", body: formulario });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.erro || "Erro ao processar o documento.");
+      selecionado = d.id; mostrarResultado(d); etapas(-1, 5); carregarHistorico();
+    } catch (e) {
+      mostrarErro(e.message === "Failed to fetch" ? "Não foi possível conectar à API." : e.message); etapas(0, 0);
     } finally {
-      botao.disabled = false;
-      botao.classList.remove("carregando");
-      document.getElementById("texto-botao").textContent = "Processar documento";
+      botao.disabled = false; botao.classList.remove("carregando"); $("texto-botao").textContent = "Processar documento";
     }
   });
+
+  carregarHistorico();
 </script>
 </body>
 </html>

@@ -1,0 +1,14 @@
+# Configuração do deploy no Render (https://render.com)
+services:
+  - type: web
+    name: validacao-documentos
+    runtime: docker
+    plan: free
+    healthCheckPath: /status
+    envVars:
+      - key: IA_API_KEY
+        sync: false        # o Render pede o valor no painel (não fica no GitHub)
+      - key: IA_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai/
+      - key: IA_MODELO
+        value: gemini-flash-latest

@@ -1,66 +1,106 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-from pydantic import BaseModel, Field
-from PIL import Image
-from pdf2image import convert_from_bytes
-import pytesseract
-import io
+"""API da Validação Inteligente de Documentos.
 
-# docs_url=None e redoc_url=None: desligamos as páginas padrão (em inglês)
-# para servir a nossa versão traduzida em /docs.
-app = FastAPI(
-    title="Validação Inteligente de Documentos",
-    description=(
-        "API que recebe documentos digitais (PDF ou imagem), extrai o texto com OCR, "
-        "identifica as informações com IA e valida as regras de negócio."
-    ),
-    version="0.1.0",
-    docs_url=None,
-    redoc_url=None,
-    openapi_tags=[
-        {"name": "Status", "description": "Verifica se a API está funcionando."},
-        {"name": "Documentos", "description": "Envio e processamento de documentos."},
-    ],
-)
+Fluxo: Upload -> OCR -> IA -> Validação -> Banco -> Consulta do resultado
+"""
+from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app import config, ia, ocr
+from app.banco import Documento, criar_tabelas, obter_sessao
+from app.docs_ptbr import pagina_docs
+from app.regras import aplicar_regras
 
 TIPOS_ACEITOS = (".pdf", ".png", ".jpg", ".jpeg")
 PASTA_STATIC = Path(__file__).parent / "static"
+
+
+@asynccontextmanager
+async def ao_iniciar(app: FastAPI):
+    criar_tabelas()
+    config.PASTA_ARQUIVOS.mkdir(parents=True, exist_ok=True)
+    yield
+
+
+app = FastAPI(
+    title="Validação Inteligente de Documentos",
+    description=(
+        "API que recebe comprovantes de residência (PDF ou imagem), extrai o texto com OCR, "
+        "identifica as informações com IA, valida as regras de negócio e guarda o resultado."
+    ),
+    version="1.0.0",
+    docs_url=None,
+    redoc_url=None,
+    lifespan=ao_iniciar,
+    openapi_tags=[
+        {"name": "Status", "description": "Verifica se a API está funcionando."},
+        {"name": "Documentos", "description": "Envio, processamento e consulta de documentos."},
+    ],
+)
 app.mount("/static", StaticFiles(directory=PASTA_STATIC), name="static")
 
 
-# ---------- Página inicial (frontend) ----------
-@app.get("/", include_in_schema=False)
-def pagina_inicial():
-    return FileResponse(PASTA_STATIC / "index.html")
+# ---------- Modelos de resposta ----------
+class DadosExtraidos(BaseModel):
+    nome: str | None = Field(None, description="Nome do titular", examples=["Maria Da Silva"])
+    cpf: str | None = Field(None, description="CPF do titular", examples=["529.982.247-25"])
+    endereco: str | None = Field(None, description="Endereço", examples=["Rua das Flores, 123 - Recife/PE"])
+    cep: str | None = Field(None, description="CEP", examples=["50000-000"])
+    data_emissao: str | None = Field(None, description="Data de emissão (AAAA-MM-DD)", examples=["2026-11-10"])
 
 
-# ---------- Modelos ----------
+class ResultadoRegra(BaseModel):
+    codigo: str = Field(..., examples=["EMISSAO"])
+    descricao: str = Field(..., examples=["Emissão em até 90 dias"])
+    ok: bool = Field(..., description="Se a regra foi atendida")
+    mensagem: str = Field(..., examples=["Emitido há 15 dias."])
+    obrigatoria: bool = Field(..., description="Se a regra pode reprovar o documento")
+
+
+class RespostaDocumento(BaseModel):
+    id: int = Field(..., examples=[1])
+    nome_arquivo: str = Field(..., examples=["comprovante.pdf"])
+    criado_em: datetime
+    status: str = Field(..., description="APROVADO ou REPROVADO", examples=["APROVADO"])
+    paginas: int = Field(..., examples=[1])
+    confianca_ocr: float = Field(..., description="Qualidade da leitura do OCR (0 a 100)", examples=[91.5])
+    metodo_extracao: str = Field(..., description="Como os dados foram extraídos", examples=["IA (gemini-flash-latest)"])
+    dados: DadosExtraidos
+    regras: list[ResultadoRegra]
+    texto_extraido: str = Field(..., description="Texto reconhecido pelo OCR")
+
+
+class ItemHistorico(BaseModel):
+    id: int = Field(..., examples=[1])
+    nome_arquivo: str = Field(..., examples=["comprovante.pdf"])
+    criado_em: datetime
+    status: str = Field(..., examples=["REPROVADO"])
+    nome: str | None = Field(None, examples=["Maria Da Silva"])
+
+
 class RespostaStatus(BaseModel):
-    status: str = Field(..., description="Situação da API", examples=["online"])
-    versao_tesseract: str = Field(..., description="Versão do motor de OCR instalado", examples=["5.3.4"])
-
-
-class RespostaUpload(BaseModel):
-    arquivo: str = Field(..., description="Nome do arquivo enviado", examples=["comprovante_residencia.pdf"])
-    paginas: int = Field(..., description="Quantidade de páginas processadas", examples=[1])
-    texto_extraido: str = Field(..., description="Texto reconhecido pelo OCR", examples=["CONTA DE ENERGIA - Nome: Maria da Silva - CEP: 50000-000"])
+    status: str = Field(..., examples=["online"])
+    versao_tesseract: str = Field(..., examples=["5.3.4"])
+    ia: str = Field(..., description="Situação da IA", examples=["configurada"])
 
 
 class RespostaErro(BaseModel):
-    erro: str = Field(..., description="Mensagem explicando o erro", examples=["Tipo de arquivo não suportado. Envie PDF, PNG ou JPG."])
+    erro: str = Field(..., examples=["Documento não encontrado."])
 
 
 # ---------- Erros em português ----------
 @app.exception_handler(RequestValidationError)
 async def erro_validacao(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=422,
-        content={"erro": "Dados inválidos na requisição. Verifique se o arquivo foi enviado."},
-    )
+    return JSONResponse(status_code=422, content={"erro": "Dados inválidos na requisição. Verifique se o arquivo foi enviado."})
 
 
 @app.exception_handler(HTTPException)
@@ -68,170 +108,111 @@ async def erro_http(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"erro": exc.detail})
 
 
+def _para_resposta(doc: Documento) -> dict:
+    return {
+        "id": doc.id, "nome_arquivo": doc.nome_arquivo, "criado_em": doc.criado_em, "status": doc.status,
+        "paginas": doc.paginas, "confianca_ocr": doc.confianca_ocr, "metodo_extracao": doc.metodo_extracao,
+        "dados": doc.dados, "regras": doc.regras, "texto_extraido": doc.texto_extraido,
+    }
+
+
+# ---------- Páginas ----------
+@app.get("/", include_in_schema=False)
+def pagina_inicial():
+    return FileResponse(PASTA_STATIC / "index.html")
+
+
+@app.get("/docs", include_in_schema=False)
+def documentacao():
+    return pagina_docs(app.openapi_url, "Documentação - Validação Inteligente de Documentos")
+
+
 # ---------- Endpoints ----------
-@app.get(
-    "/status",
-    tags=["Status"],
-    summary="Verificar status da API",
-    description="Retorna se a API está online e a versão do Tesseract (OCR).",
-    response_model=RespostaStatus,
-    response_description="API funcionando",
-)
+@app.get("/status", tags=["Status"], summary="Verificar status da API", response_model=RespostaStatus,
+         response_description="API funcionando")
 def verificar_status():
-    return {"status": "online", "versao_tesseract": str(pytesseract.get_tesseract_version())}
+    return {
+        "status": "online",
+        "versao_tesseract": ocr.versao_tesseract(),
+        "ia": "configurada" if ia.ia_configurada() else "não configurada (usando padrões)",
+    }
 
 
 @app.post(
-    "/upload",
-    tags=["Documentos"],
-    summary="Enviar documento",
-    description="Envie um arquivo **PDF, PNG ou JPG**. O sistema extrai o texto usando OCR em português.",
-    response_model=RespostaUpload,
-    response_description="Documento processado com sucesso",
+    "/documentos", tags=["Documentos"], summary="Enviar e validar documento",
+    description="Envie um comprovante de residência em **PDF, PNG ou JPG**. O sistema faz o OCR, extrai os dados, "
+                "aplica as regras de negócio, guarda o resultado e devolve **APROVADO** ou **REPROVADO**.",
+    response_model=RespostaDocumento, status_code=201, response_description="Documento processado",
     responses={
-        400: {"model": RespostaErro, "description": "Tipo de arquivo não suportado"},
+        400: {"model": RespostaErro, "description": "Arquivo inválido"},
         422: {"model": RespostaErro, "description": "Nenhum arquivo foi enviado"},
         500: {"model": RespostaErro, "description": "Erro ao processar o documento"},
     },
 )
 async def enviar_documento(
-    arquivo: UploadFile = File(..., description="Documento em PDF ou imagem"),
+    arquivo: UploadFile = File(..., description="Comprovante de residência em PDF ou imagem"),
+    sessao: Session = Depends(obter_sessao),
 ):
-    if not arquivo.filename.lower().endswith(TIPOS_ACEITOS):
-        raise HTTPException(status_code=400, detail="Tipo de arquivo não suportado. Envie PDF, PNG ou JPG.")
+    nome = arquivo.filename or "arquivo"
+    if not nome.lower().endswith(TIPOS_ACEITOS):
+        raise HTTPException(400, "Tipo de arquivo não suportado. Envie PDF, PNG ou JPG.")
+    conteudo = await arquivo.read()
+    if not conteudo:
+        raise HTTPException(400, "O arquivo está vazio.")
+    if len(conteudo) > config.TAMANHO_MAXIMO_MB * 1024 * 1024:
+        raise HTTPException(400, f"Arquivo muito grande. O limite é {config.TAMANHO_MAXIMO_MB} MB.")
 
+    # 1. OCR
     try:
-        conteudo = await arquivo.read()
-        if arquivo.filename.lower().endswith(".pdf"):
-            imagens = convert_from_bytes(conteudo)
-        else:
-            imagens = [Image.open(io.BytesIO(conteudo))]
-        texto = "\n".join(pytesseract.image_to_string(img, lang="por") for img in imagens)
-    except Exception as erro:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar o documento: {erro}")
+        resultado_ocr = ocr.extrair_texto(conteudo, nome)
+    except Exception:
+        raise HTTPException(400, "Não foi possível ler o arquivo. Verifique se ele não está corrompido.")
 
-    return {"arquivo": arquivo.filename, "paginas": len(imagens), "texto_extraido": texto}
+    # 2. IA (extração dos dados)
+    dados, metodo = ia.extrair_dados(resultado_ocr.texto)
 
+    # 3. Regras de negócio e decisão
+    status, regras = aplicar_regras(dados, resultado_ocr.texto, resultado_ocr.confianca)
 
-# ---------- Página /docs traduzida para pt-BR ----------
-TRADUCAO_SWAGGER = """
-<script>
-const TRADUCOES = {
-  "Try it out": "Experimentar",
-  "Cancel": "Cancelar",
-  "Execute": "Executar",
-  "Clear": "Limpar",
-  "Parameters": "Parâmetros",
-  "No parameters": "Sem parâmetros",
-  "Request body": "Corpo da requisição",
-  "required": "obrigatório",
-  "Responses": "Respostas",
-  "Response": "Resposta",
-  "Code": "Código",
-  "Details": "Detalhes",
-  "Description": "Descrição",
-  "Media type": "Tipo de mídia",
-  "Controls Accept header.": "Define o cabeçalho Accept.",
-  "Example Value": "Exemplo",
-  "Example": "Exemplo",
-  "Schema": "Estrutura",
-  "Schemas": "Estruturas",
-  "Curl": "Comando cURL",
-  "Request URL": "URL da requisição",
-  "Server response": "Resposta do servidor",
-  "Response body": "Corpo da resposta",
-  "Response headers": "Cabeçalhos da resposta",
-  "Download": "Baixar",
-  "Loading...": "Carregando...",
-  "Undocumented": "Não documentado",
-  "Successful Response": "Resposta com sucesso",
-  "Validation Error": "Erro de validação",
-  "Failed to fetch.": "Falha ao conectar com a API.",
-  "Possible Reasons:": "Possíveis motivos:",
-  "Expand all": "Expandir tudo",
-  "Collapse all": "Recolher tudo",
-  "Copy to clipboard": "Copiar",
-  "Name": "Nome",
-  "Request content type": "Tipo de conteúdo da requisição",
-  "Media Type": "Tipo de mídia",
-  "Reset": "Restaurar",
-  "Links": "Ligações",
-  "No links": "Sem ligações",
-  "Controls": "Define o valor do cabeçalho",
-  "header.": "da requisição.",
-  "string": "texto",
-  "integer": "número inteiro",
-  "number": "número",
-  "boolean": "verdadeiro/falso",
-  "array": "lista",
-  "object": "objeto",
-  "Servers": "Servidores",
-  "Required field is not provided": "Campo obrigatório não preenchido",
-  "Value must be a string": "O valor deve ser um texto",
-  "Value must be a number": "O valor deve ser um número",
-  "Filter by tag": "Filtrar por grupo",
-};
-
-function traduzir(raiz) {
-  const caminhante = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
-  let no;
-  while ((no = caminhante.nextNode())) {
-    const texto = no.nodeValue.trim();
-    if (TRADUCOES[texto] && TRADUCOES[texto] !== texto) no.nodeValue = no.nodeValue.replace(texto, TRADUCOES[texto]);
-  }
-  raiz.querySelectorAll?.("[title], [placeholder], [aria-label]").forEach(el => {
-    ["title", "placeholder", "aria-label"].forEach(attr => {
-      const v = el.getAttribute(attr);
-      if (v && TRADUCOES[v.trim()]) el.setAttribute(attr, TRADUCOES[v.trim()]);
-    });
-  });
-}
-
-// O botão "Choose File" é desenhado pelo navegador. Colocamos um botão
-// em português por cima dele (o campo original continua funcionando).
-function traduzirCampoArquivo(raiz) {
-  raiz.querySelectorAll?.('input[type="file"]:not([data-ptbr])').forEach(input => {
-    input.dataset.ptbr = "1";
-    const caixa = input.parentElement;
-    caixa.style.position = "relative";
-    caixa.style.display = "inline-block";
-    const rotulo = document.createElement("span");
-    rotulo.className = "ptbr-arquivo";
-    rotulo.innerHTML = '<span class="btn">Escolher arquivo</span> <span class="nome">Nenhum arquivo escolhido</span>';
-    caixa.appendChild(rotulo);
-    Object.assign(input.style, { position: "absolute", inset: "0", opacity: "0", cursor: "pointer", width: "100%" });
-    input.addEventListener("change", () => {
-      rotulo.querySelector(".nome").textContent =
-        input.files.length ? input.files[0].name : "Nenhum arquivo escolhido";
-    });
-  });
-}
-
-document.documentElement.lang = "pt-BR";
-// esconde o selo "OAS 3.1" e o link "/openapi.json" (termos técnicos em inglês)
-const estilo = document.createElement("style");
-estilo.textContent = `
-  .version-stamp, .info .link { display: none !important; }
-  .swagger-ui .parameter__name.required:after,
-  .swagger-ui .opblock-section-request-body .required:after { content: "obrigatório" !important; }
-  .ptbr-arquivo { display: inline-block; padding: 6px 4px; font-family: sans-serif; font-size: 13px; }
-  .ptbr-arquivo .btn { padding: 3px 10px; border: 1px solid #888; border-radius: 4px; background: #f0f0f0; }
-`;
-document.head.appendChild(estilo);
-new MutationObserver(() => { traduzir(document.body); traduzirCampoArquivo(document.body); })
-  .observe(document.body, { childList: true, subtree: true, characterData: true });
-traduzir(document.body);
-traduzirCampoArquivo(document.body);
-</script>
-"""
-
-
-@app.get("/docs", include_in_schema=False)
-def documentacao():
-    pagina = get_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title="Documentação - Validação Inteligente de Documentos",
-        swagger_ui_parameters={"defaultModelsExpandDepth": -1},  # esconde a seção "Schemas"
+    # 4. Guardar o arquivo e o resultado no banco
+    caminho = config.PASTA_ARQUIVOS / f"{uuid4().hex}{Path(nome).suffix.lower()}"
+    caminho.write_bytes(conteudo)
+    doc = Documento(
+        nome_arquivo=nome, caminho_arquivo=str(caminho), paginas=resultado_ocr.paginas,
+        confianca_ocr=resultado_ocr.confianca, texto_extraido=resultado_ocr.texto,
+        metodo_extracao=metodo, dados=dados, regras=regras, status=status,
     )
-    html = pagina.body.decode("utf-8").replace("</body>", TRADUCAO_SWAGGER + "</body>")
-    return HTMLResponse(html)
+    sessao.add(doc)
+    sessao.commit()
+    sessao.refresh(doc)
+    return _para_resposta(doc)
+
+
+@app.get("/documentos", tags=["Documentos"], summary="Listar histórico",
+         description="Lista os documentos processados, do mais recente para o mais antigo.",
+         response_model=list[ItemHistorico], response_description="Histórico de documentos")
+def listar_documentos(sessao: Session = Depends(obter_sessao)):
+    docs = sessao.scalars(select(Documento).order_by(Documento.id.desc()).limit(100)).all()
+    return [{"id": d.id, "nome_arquivo": d.nome_arquivo, "criado_em": d.criado_em,
+             "status": d.status, "nome": (d.dados or {}).get("nome")} for d in docs]
+
+
+@app.get("/documentos/{documento_id}", tags=["Documentos"], summary="Consultar resultado",
+         description="Mostra o resultado completo de um documento: dados extraídos, regras e decisão.",
+         response_model=RespostaDocumento, response_description="Resultado do documento",
+         responses={404: {"model": RespostaErro, "description": "Documento não encontrado"}})
+def consultar_documento(documento_id: int, sessao: Session = Depends(obter_sessao)):
+    doc = sessao.get(Documento, documento_id)
+    if not doc:
+        raise HTTPException(404, "Documento não encontrado.")
+    return _para_resposta(doc)
+
+
+@app.get("/documentos/{documento_id}/arquivo", tags=["Documentos"], summary="Baixar arquivo original",
+         response_description="Arquivo original enviado",
+         responses={404: {"model": RespostaErro, "description": "Documento não encontrado"}})
+def baixar_arquivo(documento_id: int, sessao: Session = Depends(obter_sessao)):
+    doc = sessao.get(Documento, documento_id)
+    if not doc or not Path(doc.caminho_arquivo).exists():
+        raise HTTPException(404, "Documento não encontrado.")
+    return FileResponse(doc.caminho_arquivo, filename=doc.nome_arquivo)
