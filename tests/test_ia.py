@@ -77,3 +77,33 @@ def test_resposta_da_ia_e_conferida():
     assert limpo["cep"] is None
     assert limpo["data_emissao"] is None
     assert limpo["endereco"] == "Rua A, 10"
+
+
+def test_gemini_usa_api_nativa(monkeypatch):
+    """Chaves novas do Gemini (AQ.) precisam da API nativa do Google."""
+    import httpx
+
+    monkeypatch.setattr(ia.config, "IA_API_KEY", "AQ.chave-de-teste")
+    monkeypatch.setattr(ia.config, "IA_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+    monkeypatch.setattr(ia.config, "IA_MODELO", "gemini-flash-latest")
+    chamada = {}
+
+    class RespostaFalsa:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            texto = '```json\n{"nome": "Maria da Silva", "cpf": null, "endereco": "Rua das Flores, 123", "cep": "50050000", "data_emissao": "2026-11-10"}\n```'
+            return {"candidates": [{"content": {"parts": [{"text": texto}]}}]}
+
+    def post_falso(url, headers, json, timeout):
+        chamada.update(url=url, headers=headers)
+        return RespostaFalsa()
+
+    monkeypatch.setattr(httpx, "post", post_falso)
+    dados, metodo = ia.extrair_dados(TEXTO_OCR)
+    assert chamada["url"].endswith("/models/gemini-flash-latest:generateContent")
+    assert chamada["headers"]["x-goog-api-key"] == "AQ.chave-de-teste"
+    assert metodo == "IA (gemini-flash-latest)"
+    assert dados["cep"] == "50050-000"
+    assert dados["cpf"] == "529.982.247-25"   # a IA não achou; completado pelos padrões

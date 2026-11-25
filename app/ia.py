@@ -149,15 +149,40 @@ def _limpar_resposta_ia(bruto: dict) -> dict:
     return limpo
 
 
-def extrair_com_ia(texto: str) -> dict:
+def _usa_gemini_nativo() -> bool:
+    """Chaves novas do Gemini (AQ.) só funcionam na API nativa do Google."""
+    return "generativelanguage.googleapis.com" in (config.IA_BASE_URL or "")
+
+
+def _chamar_gemini(prompt: str) -> str:
+    import httpx
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{config.IA_MODELO}:generateContent"
+    resposta = httpx.post(
+        url,
+        headers={"x-goog-api-key": config.IA_API_KEY, "Content-Type": "application/json"},
+        json={"contents": [{"parts": [{"text": prompt}]}]},
+        timeout=60,
+    )
+    resposta.raise_for_status()
+    partes = resposta.json()["candidates"][0]["content"]["parts"]
+    return "".join(parte.get("text", "") for parte in partes)
+
+
+def _chamar_compativel_openai(prompt: str) -> str:
     from openai import OpenAI
 
     cliente = OpenAI(api_key=config.IA_API_KEY, base_url=config.IA_BASE_URL, timeout=60)
     resposta = cliente.chat.completions.create(
         model=config.IA_MODELO,
-        messages=[{"role": "user", "content": PROMPT.replace("{texto}", texto[:8000])}],
+        messages=[{"role": "user", "content": prompt}],
     )
-    conteudo = resposta.choices[0].message.content or ""
+    return resposta.choices[0].message.content or ""
+
+
+def extrair_com_ia(texto: str) -> dict:
+    prompt = PROMPT.replace("{texto}", texto[:8000])
+    conteudo = _chamar_gemini(prompt) if _usa_gemini_nativo() else _chamar_compativel_openai(prompt)
     json_texto = re.search(r"\{.*\}", conteudo, re.DOTALL)
     if not json_texto:
         raise ValueError("A IA não devolveu um JSON.")
